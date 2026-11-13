@@ -17,6 +17,9 @@ const swaggerOptions = {
     customeSiteTitle: 'PetClinic REST API'
 };
 
+const meteringMiddleware = require('./middleware/meteringMiddleware');
+const { startMeteringScheduler } = require('./metering/meteringScheduler');
+
 //console.log(swaggerSpec);
 const PORT = config.port;
 //mongoose.set('useCreateIndex', true);
@@ -36,6 +39,12 @@ seedDb();
 const app = express();
 expressConfig(app);
 
+// Count every inbound HTTP request exactly once (SAP Unified Metering:
+// HS_PET_CLINIC_MONTLY_USER_COUNT). Registered before allRoutes so the counter
+// is traversed by every request handled by the Express pipeline, including
+// requests that never reach a mounted router (e.g. 404s).
+app.use(meteringMiddleware);
+
 // Register all routes from local routes.js file
 allRoutes(app);
 
@@ -53,5 +62,8 @@ app.listen(PORT, function() {
     console.log(`Server is listening on port ${PORT} in ${app.get('env')} mode`);
 });
 app.emit('APP_STARTED');
+
+// Start the hourly SAP Unified Metering flush after the HTTP server is up.
+startMeteringScheduler();
 
 module.exports = app;
